@@ -3009,7 +3009,7 @@ async function main() {
             core.setFailed('ERROR: check_names must be an array of strings.');
             return;
         }
-        if (statuses.length > 0 || !statuses.every(item => { return IsValidStatus(item); })) {
+        if (statuses.length > 0 && !statuses.every(item => { return IsValidStatus(item); })) {
             core.setFailed('ERROR: statuses must be an array of valid status strings.');
             return;
         }
