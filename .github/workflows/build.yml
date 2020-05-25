@@ -1,0 +1,50 @@
+name: "build"
+
+on: 
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test_a:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        sleep 2
+
+  test_b:
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        sleep 3
+        
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ./
+      id: wait_for_completion
+      with: 
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        check_names: '["test_a", "test_b"]'
+        statuses: '["completed", "completed"]'
+        ref: master
+        timeout: 300
+        poll_interval: 10
+        
+    - name: Print Check-Run Results
+      run: |
+        echo STATUSES: ${{ steps.wait_for_completion.outputs.result }}
+        
+    - name: Parse Output
+      id: parsed_results
+      run: |
+        res='${{ steps.wait_for_completion.outputs.result }}'
+        res=$(jq -cs . <<< $(jq '.[].id' <<< $res))
+        echo "::set-output name=result::$res"
+        
+    - name: Print Final Results
+      run: |
+        echo 'IDs: ${{ steps.parsed_results.outputs.result }}'

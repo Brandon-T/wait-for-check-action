@@ -1,0 +1,37 @@
+name: 'wait-for-check-run'
+description: 'Waits for a check-run to complete.'
+
+inputs:
+  github_token:
+    description: 'GitHub token or secret'
+    required: true
+  check_names:
+    description: 'A list of check-run names (formatted as a JSON array)'
+    required: true
+  statuses:
+    description: 'A list of status types (formatted as a JSON array)'
+    required: false
+  owner:
+    description: 'Repository Owner'
+    required: false
+  repo:
+    description: 'Repository Name'
+    required: false
+  ref:
+    description: 'Commit hash, tag, or branch name'
+    required: false
+  timeout:
+    description: 'Total amount of time to wait for check-runs to be completed.'
+    required: false
+    default: '300'
+  poll_interval:
+    description: 'Time between requests (checks every `poll_interval` milliseconds for the check-run status).'
+    default: '10'
+
+outputs:
+  result: 
+    description: 'JSON array of check-run information [{"id": 1234, "name": "build", "status": "completed|failed", "conclusion": "success|failure"}].'
+
+runs:
+  using: 'node12'
+  main: 'src/index.js'
