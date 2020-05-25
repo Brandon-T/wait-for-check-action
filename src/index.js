@@ -2870,6 +2870,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(310));
 const github_1 = __webpack_require__(462);
 const github_2 = __webpack_require__(462);
+const valid_statuses = ["queued", "in_progress", "completed"];
+const valid_conclusions = ["success", "failure", "neutral", "cancelled", "timed_out", "action_required"];
+function IsValidStatus(status) {
+    return valid_statuses.find(item => { return item === status; }) != null;
+}
+function IsValidConclusion(conclusion) {
+    return valid_conclusions.find(item => { return item === conclusion; }) != null;
+}
 function IsValidJson(str) {
     try {
         JSON.parse(str);
@@ -2880,7 +2888,7 @@ function IsValidJson(str) {
     return true;
 }
 function NormalizeResponse(names, check_runs) {
-    var response_statuses = [];
+    var response = [];
     var data = check_runs.map(element => {
         return {
             id: element.id,
@@ -2893,14 +2901,14 @@ function NormalizeResponse(names, check_runs) {
         var found = false;
         data = data.filter(item => {
             if (!found && item.name == names[i]) {
-                response_statuses.push(item.status);
+                response.push(item);
                 found = true;
                 return false;
             }
             return true;
         });
     }
-    return response_statuses;
+    return response;
 }
 async function wait_for(milliseconds) {
     return new Promise(function (resolve, reject) {
@@ -2935,23 +2943,23 @@ async function check(token, owner, repo, ref, names, statuses, poll_interval, ti
             });
             console.log(`Retrieved: ${JSON.stringify(result.map(item => { return { name: item.name, status: item.status }; }))}`);
             if (statuses.length > 0) {
-                const response_statuses = NormalizeResponse(names, check_runs);
-                const did_all_complete = response_statuses.length === statuses.length && response_statuses.every((value, index) => {
-                    return value === statuses[index];
+                const normalized_resposne = NormalizeResponse(names, check_runs);
+                const did_all_complete = normalized_resposne.length === statuses.length && normalized_resposne.every((value, index) => {
+                    return value.status === statuses[index];
                 });
                 if (did_all_complete) {
                     console.log('All check-runs are completed.');
-                    return result;
+                    return normalized_resposne;
                 }
             }
             else {
-                const response_statuses = NormalizeResponse(names, check_runs);
-                const did_all_complete = response_statuses.every(value => {
-                    return value === "completed";
+                const normalized_resposne = NormalizeResponse(names, check_runs);
+                const did_all_complete = normalized_resposne.every(value => {
+                    return value.status === "completed";
                 });
                 if (did_all_complete) {
                     console.log('All check-runs are completed.');
-                    return result;
+                    return normalized_resposne;
                 }
             }
         }
@@ -2962,48 +2970,59 @@ async function check(token, owner, repo, ref, names, statuses, poll_interval, ti
     }
     return null;
 }
+function GetStringArray(input, is_required) {
+    let values = core.getInput(input, { required: is_required });
+    if (values != null && typeof values === 'string' && !IsValidJson(values)) {
+        values = `[${values}]`;
+    }
+    if (values == null) {
+        values = '[]';
+    }
+    if (!IsValidJson(values)) {
+        return undefined;
+    }
+    let res = JSON.parse(values);
+    if (!Array.isArray(res) || !res.every(item => typeof item === 'string')) {
+        return undefined;
+    }
+    return res;
+}
 async function main() {
     try {
-        let raw_names = core.getInput('check_names', { required: true });
-        if (raw_names != null && typeof raw_names === 'string' && !IsValidJson(raw_names)) {
-            raw_names = `[${raw_names}]`;
-        }
-        if (raw_names == null) {
-            raw_names = '[]';
-        }
-        if (!IsValidJson(raw_names)) {
-            core.setFailed('ERROR: check_names must be an array of strings.');
-            return;
-        }
-        let raw_statuses = core.getInput('statuses', { required: false });
-        if (raw_statuses != null && typeof raw_statuses === 'string' && !IsValidJson(raw_statuses)) {
-            raw_statuses = `[${raw_statuses}]`;
-        }
-        if (raw_statuses == null) {
-            raw_statuses = '[]';
-        }
-        if (!IsValidJson(raw_statuses)) {
-            core.setFailed('ERROR: statuses must be an array of strings.');
+        const raw_names = GetStringArray('check_names', true);
+        const raw_statuses = GetStringArray('statuses', false);
+        const raw_conclusions = GetStringArray('conclusions', false);
+        if (raw_names == null || raw_statuses == null || raw_conclusions == null) {
+            core.setFailed("Invalid Input for check_names or statuses or conclusions.");
             return;
         }
         const token = core.getInput('github_token', { required: true });
-        const check_names = JSON.parse(raw_names);
-        const statuses = JSON.parse(raw_statuses);
+        const check_names = raw_names;
+        const statuses = raw_statuses;
+        const conclusions = raw_conclusions;
         const owner = core.getInput('owner') || github_2.context.repo.owner;
         const repo = core.getInput('repo') || github_2.context.repo.repo;
         const ref = core.getInput('ref') || github_2.context.ref;
         const timeout = parseInt(core.getInput('timeout') || '300');
         const poll_interval = parseInt(core.getInput('poll_interval') || '10');
-        if (!Array.isArray(check_names) || check_names.length <= 0 || !check_names.every(item => typeof item === 'string')) {
+        if (check_names.length <= 0) {
             core.setFailed('ERROR: check_names must be an array of strings.');
             return;
         }
-        if (!Array.isArray(statuses) || !statuses.every(item => typeof item === 'string')) {
-            core.setFailed('ERROR: statuses must be an array of strings.');
+        if (statuses.length > 0 || !statuses.every(item => { return IsValidStatus(item); })) {
+            core.setFailed('ERROR: statuses must be an array of valid status strings.');
+            return;
+        }
+        if (conclusions.length > 0 && !conclusions.every(item => { return IsValidConclusion(item); })) {
+            core.setFailed('ERROR: conclusions must be an array of valid conclusion strings or empty.');
             return;
         }
         if (statuses.length > 0 && statuses.length != check_names.length) {
             core.setFailed('ERROR: amount of statuses do not match amount of check_names.');
+            return;
+        }
+        if (conclusions.length > 0 && conclusions.length != check_names.length) {
+            core.setFailed('ERROR: amount of conclusions do not match amount of check_names.');
             return;
         }
         const result = await check(token, owner, repo, ref, check_names, statuses, poll_interval, timeout);
@@ -3011,7 +3030,21 @@ async function main() {
             core.setFailed('ERROR: timed-out.');
             return;
         }
-        core.setOutput('result', JSON.stringify(result));
+        const output = result;
+        if (conclusions.length > 0 && !output.every((value, index) => { return value.conclusion === conclusions[index]; })) {
+            core.setOutput('result', output);
+            core.setOutput('ids', output.map(item => { return item.id; }));
+            core.setOutput('names', output.map(item => { return item.name; }));
+            core.setOutput('statuses', output.map(item => { return item.status; }));
+            core.setOutput('conclusions', output.map(item => { return item.conclusion; }));
+            core.setFailed('ERROR: Conclusion failure.');
+            return;
+        }
+        core.setOutput('result', output);
+        core.setOutput('ids', output.map(item => { return item.id; }));
+        core.setOutput('names', output.map(item => { return item.name; }));
+        core.setOutput('statuses', output.map(item => { return item.status; }));
+        core.setOutput('conclusions', output.map(item => { return item.conclusion; }));
     }
     catch (error) {
         core.setFailed(error.message);

@@ -11,6 +11,9 @@ inputs:
   statuses:
     description: 'A list of status types (formatted as a JSON array)'
     required: false
+  conclusions:
+    description: 'A list of conclusions that must be satisfied for the job to succeed (formatted as a JSON array)'
+    required: false
   owner:
     description: 'Repository Owner'
     required: false
@@ -31,6 +34,14 @@ inputs:
 outputs:
   result: 
     description: 'JSON array of check-run information [{"id": 1234, "name": "build", "status": "completed|failed", "conclusion": "success|failure"}].'
+  ids:
+    description: 'List of check-run IDs [1234, 5678].'
+  names:
+    description: 'List of check-run names ["check_name_1", "check_name_2"].'
+  statuses:
+    description: 'List of check-run statuses ["in_progress", "completed", "queued"].'
+  conclusions:
+    description: 'List of checkrun conclusions ["cancelled", "success", "failure"].'
 
 runs:
   using: 'node12'

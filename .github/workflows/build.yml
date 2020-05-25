@@ -30,17 +30,23 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         check_names: '["test_a", "test_b"]'
         statuses: '["completed", "completed"]'
+        conclusions: '["success", "success"]'
         ref: master
         timeout: 300
         poll_interval: 10
         
     - name: Print Check-Run Results
       run: |
-        echo STATUSES: ${{ steps.wait_for_completion.outputs.result }}
+        echo Result: ${{ steps.wait_for_completion.outputs.result }}
+        echo IDs: ${{ steps.wait_for_completion.outputs.ids }}
+        echo Names: ${{ steps.wait_for_completion.outputs.names }}
+        echo Statuses: ${{ steps.wait_for_completion.outputs.statuses }}
+        echo Conclusions: ${{ steps.wait_for_completion.outputs.conclusions }}
         
     - name: Parse Output
       id: parsed_results
       run: |
+        # Not Needed because we have many different output formats.. but just kept as an example of how to parse 'result'
         res='${{ steps.wait_for_completion.outputs.result }}'
         res=$(jq -cs . <<< $(jq '.[].id' <<< $res))
         echo "::set-output name=result::$res"
